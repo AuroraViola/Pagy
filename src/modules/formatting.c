@@ -1,104 +1,148 @@
 #include <malloc.h>
 #include "../includes/formatting.h"
 
-bool move_pointer_to_next_word(unicode_file_content *content) {
-    bool was_endl = false;
+int get_word_count(struct Row *row) {
+    int word_count = 0;
+    struct Word *word = row->words;
+    while (word != NULL) {
+        word_count++;
+        word = word->next_word;
+    }
+    return word_count;
+}
 
-    bool found_space = false;
-    while (!found_space && (!is_space(content->chars[content->index]) || !is_endl(content->chars[content->index]))) {
-        if (is_space(content->chars[content->index])) {
-            found_space = true;
+int get_row_length(struct Row *row) {
+    int length = 0;
+    struct Word *word = row->words;
+    while (word != NULL) {
+        length += word->length;
+        word = word->next_word;
+    }
+    return length;
+}
+
+int get_row_charlength(struct Row *row) {
+    int row_char = 0;
+    int words = get_word_count(row);
+    if (words > 0) {
+        row_char = get_row_length(row) + (words-1);
+    }
+    return row_char;
+}
+
+bool is_utf8_char(uint8_t byte) {
+    return ((byte != 0x20) && (byte != 0xd) && (byte != 0xa));
+}
+
+uint8_t get_char_length(uint8_t byte) {
+    switch(byte) {
+        case 0x00 ... 0x7f:
+            return 1;
+        case 0xc0 ... 0xdf:
+            return 2;
+        case 0xe0 ... 0xef:
+            return 3;
+        case 0xf0 ... 0xf4:
+            return 4;
+        default:
+            return 1;
+    }
+}
+
+uint16_t get_word_length(struct Word *word, file_content *content) {
+    uint16_t length = 0;
+    uint64_t i = word->start;
+    while (i < word->end) {
+        length += get_char_length(content->bytes[i]);
+        i++;
+    }
+    return length;
+}
+
+struct Word *get_word(file_content *content, int row_length) {
+    struct Word *word = malloc(sizeof(struct Word));
+    word->next_word = NULL;
+    word->start = content->index;
+    word->end = word->start;
+
+    while (is_utf8_char(content->bytes[word->end])) {
+        word->end++;
+    }
+    word->length = get_word_length(word, content);
+    if (word->length > row_length) {
+        word->length = row_length;
+    }
+
+    return word;
+}
+
+void add_word_to_row(struct Row *row, struct Word *word) {
+    struct Word *current_word = row->words;
+    if (row->words == NULL) {
+        row->words = word;
+    }
+    else {
+        while (current_word->next_word != NULL) {
+            current_word = current_word->next_word;
         }
-        if (is_endl(content->chars[content->index])) {
-            found_space = true;
-            was_endl = true;
+        current_word->next_word = word;
+    }
+}
+
+bool go_to_next_word(file_content *content, int row_length) {
+    bool is_endl = false;
+
+    int i;
+    for (i = 0; i < row_length; i++) {
+        if (content->bytes[content->index] == 0x20) {
+            break;
         }
-        if (content->index > content->length) {
+        if (content->bytes[content->index] == 0xa || content->bytes[content->index] == 0xd) {
+            is_endl = true;
             break;
         }
         content->index++;
     }
-    return was_endl;
-}
-
-uint16_t get_word_length(unicode_file_content *content) {
-    uint16_t word_length = 0;
-    uint64_t prev_index = content->index;
-
-    while ((content->index < content->length) &&
-           !is_space(content->chars[content->index + word_length]) &&
-           !is_endl(content->chars[content->index + word_length])) {
-        word_length++;
+    while(!is_utf8_char(content->bytes[content->index])) {
+        content->index++;
     }
-    content->index = prev_index;
-
-    return word_length;
+    return is_endl;
 }
 
-void justify(unicode_char *string, int length){
-    if (is_space(string[length-1])) {
-
-    }
-}
-
-unicode_char ***get_page_text_formatted(unicode_file_content *content, struct page_format *format) {
-    int i, j, k, l;
-    unicode_char ***page_text = malloc(sizeof(unicode_char**) * format->columns);
-    for (i = 0; i < format->columns; i++) {
-        page_text[i] = malloc(sizeof(unicode_char *) * format->column_height);
-        for (j = 0; j < format->column_height; j++) {
-            page_text[i][j] = malloc(sizeof(unicode_char) * format->row_length);
-            for (k = 0; k < format->row_length; k++) {
-                unicode_char space;
-                space.length = 1;
-                space.byte[0] = 0x20;
-                page_text[i][j][k] = space;
+struct Row **get_page_rows(file_content *content, struct page_format *format) {
+    struct Row **rows = malloc(sizeof(struct Row*) * format->columns * format->column_height);
+    int i;
+    for (i = 0; i < (format->column_height * format->columns); i++) {
+        rows[i] = malloc(sizeof(struct Row) * format->row_length);
+        rows[i]->words = NULL;
+        rows[i]->type = NORMAL;
+        bool can_fit = true;
+        do {
+            struct Word *word = get_word(content, format->row_length);
+            if ((get_row_charlength(rows[i]) + word->length + 1) >= format->row_length) {
+                can_fit = false;
+                free(word);
             }
-        }
-    }
-
-    for (i = 0; i < format->columns; i++) {
-        for (j = 0; j < format->column_height; j++) {
-            for (k = 0; k < format->row_length; k++) {
-                int word_length = get_word_length(content);
-                // La parola entra
-                if (word_length <= (format->row_length - k)) {
-                    for (l = 0; l < word_length; l++) {
-                        page_text[i][j][k + l] = content->chars[content->index + l];
-                    }
-                    if (move_pointer_to_next_word(content)) {
-                        k = format->row_length;
-                    }
-                    k += word_length;
-                }
-                // La parola non entra ed è all'inizio della riga
-                else if (k == 0) {
-                    for (l = 0; l < format->row_length; l++) {
-                        page_text[i][j][k + l] = content->chars[content->index + l];
-                    }
-                    content->index += format->row_length;
-                    k = format->row_length;
-                }
-                // La parola non entra in questa riga
-                else {
-                    k = format->row_length;
+            else {
+                add_word_to_row(rows[i], word);
+                if (go_to_next_word(content, format->row_length)) {
+                    rows[i]->type = END_PARAGRAPH;
                 }
             }
-        }
+        } while (can_fit);
     }
 
-    return page_text;
+    return rows;
 }
 
-struct Page *get_formatted_text(unicode_file_content *content, struct page_format *format) {
+struct Page *get_formatted_text(file_content *content, struct page_format *format) {
     struct Page *page = malloc(sizeof(struct Page));
-
     struct Page *current_page = page;
 
     content->index = 0;
     while (content->index < content->length) {
         current_page->next_page = NULL;
-        current_page->page_text = get_page_text_formatted(content, format);
+        current_page->rows = get_page_rows(content, format);
         if (content->index < content->length) {
             current_page->next_page = malloc(sizeof(struct Page));
             current_page = current_page->next_page;

@@ -1,29 +1,24 @@
 #include "stdio.h"
 #include "../includes/output.h"
 
-void create_file(char *file_path, struct Page *pages, struct page_format *format) {
-    FILE *file = fopen(file_path, "wb");
-    int i, j, k, l;
-    if (file != NULL) {
-        while (pages != NULL) {
-            for (i = 0; i < format->column_height; i++) {
-                for (j = 0; j < format->columns; j++) {
-                    for (k = 0; k < format->row_length; k++) {
-                        for (l = 0; l < pages->page_text[j][i][k].length; l++) {
-                            fwrite(&pages->page_text[j][i][k].byte[l], 1, 1, file);
-                        }
-                    }
-                    if (j != format->columns-1)
-                    for (k = 0; k < format->column_space; k++) {
-                        fwrite(" ", 1, 1, file);
-                    }
+void create_file(char *file_path, file_content *content, struct Page *pages, struct page_format *format) {
+    struct Page *current_page = pages;
+    uint64_t j;
+    while (current_page != NULL) {
+        int i;
+        for (i = 0; i < format->column_height * format->columns; i++) {
+            struct Row *current_row = current_page->rows[i];
+            struct Word *current_word = current_row->words;
+
+            while (current_word != NULL) {
+                for (j = current_word->start; j < current_word->end; j++) {
+                    printf("%c", content->bytes[j]);
                 }
-                fwrite("\n", 1, 1, file);
+                printf(" ");
+                current_word = current_word->next_word;
             }
-            pages = pages->next_page;
-            if (pages != NULL) {
-                fwrite("\n %%% \n\n", 8, 1, file);
-            }
+            printf("\n");
         }
+        current_page = current_page->next_page;
     }
 }
