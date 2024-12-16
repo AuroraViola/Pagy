@@ -17,32 +17,33 @@ void create_file(char *file_path, file_content *content, struct Page *pages, str
                 int word_count;
                 switch (current_row->type) {
                     case NORMAL:
-                        spaces_left = format->row_length - (get_row_charlength(current_row) - words + 1);
-                        if (words <= 1) {
-                            spaces[0] = spaces_left;
-                        }
-                        else {
-                            spaces[words-1] = 0;
-                            for (k = 0; k < words - 1; k++) {
-                                spaces[k] = spaces_left / (words - 1);
+                        if (current_row->words != NULL) {
+                            spaces_left = format->row_length - (get_row_charlength(current_row) - words + 1);
+                            if (words <= 1) {
+                                spaces[0] = spaces_left;
+                            } else {
+                                spaces[words - 1] = 0;
+                                for (k = 0; k < words - 1; k++) {
+                                    spaces[k] = spaces_left / (words - 1);
+                                }
+
+                                spaces[0] += spaces_left % (words - 1);
                             }
 
-                            spaces[0] += spaces_left % (words-1);
-                        }
-
-                        word_count = 0;
-                        while (current_word != NULL) {
-                            for (k = current_word->start; k < current_word->end; k++) {
-                                printf("%c", content->bytes[k]);
+                            word_count = 0;
+                            while (current_word != NULL) {
+                                for (k = current_word->start; k < current_word->end; k++) {
+                                    printf("%c", content->bytes[k]);
+                                }
+                                for (k = 0; k < spaces[word_count]; k++) {
+                                    printf(" ");
+                                }
+                                current_word = current_word->next_word;
+                                word_count++;
                             }
-                            for (k = 0; k < spaces[word_count]; k++) {
+                            for (k = 0; k < format->column_space; k++) {
                                 printf(" ");
                             }
-                            current_word = current_word->next_word;
-                            word_count++;
-                        }
-                        for (k = 0; k < format->column_space; k++) {
-                            printf(" ");
                         }
                         break;
                     case END_PARAGRAPH:
