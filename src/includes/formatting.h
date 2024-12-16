@@ -14,6 +14,7 @@ typedef enum {
     NORMAL = 0,
     END_PARAGRAPH,
     EMPTY,
+    EMPTY_END,
 }ROW_TYPE;
 
 struct Word {

@@ -7,7 +7,7 @@
 int main(void) {
     char *input_file = "../example.txt";
     char *output_file = "../example-output.txt";
-    struct page_format format = {3, 40, 25, 8};
+    struct page_format format = {3, 32, 23, 8};
 
     file_content content = get_file_content(input_file);
     struct Page *pages = get_formatted_text(&content, &format);

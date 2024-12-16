@@ -53,8 +53,9 @@ uint16_t get_word_length(struct Word *word, file_content *content) {
     uint16_t length = 0;
     uint64_t i = word->start;
     while (i < word->end) {
-        length += get_char_length(content->bytes[i]);
-        i++;
+        uint8_t char_length = get_char_length(content->bytes[i]);
+        length++;
+        i += char_length;
     }
     return length;
 }
@@ -103,33 +104,45 @@ bool go_to_next_word(file_content *content, int row_length) {
         }
         content->index++;
     }
+
     while(!is_utf8_char(content->bytes[content->index])) {
         content->index++;
     }
+
     return is_endl;
 }
 
 struct Row **get_page_rows(file_content *content, struct page_format *format) {
-    struct Row **rows = malloc(sizeof(struct Row*) * format->columns * format->column_height);
+    int rows_num = format->columns * format->column_height;
+    struct Row **rows = malloc(sizeof(struct Row*) * rows_num);
     int i;
-    for (i = 0; i < (format->column_height * format->columns); i++) {
+    bool ended_paragraph = false;
+
+    for (i = 0; i < rows_num; i++) {
         rows[i] = malloc(sizeof(struct Row) * format->row_length);
         rows[i]->words = NULL;
-        rows[i]->type = NORMAL;
-        bool can_fit = true;
-        do {
-            struct Word *word = get_word(content, format->row_length);
-            if ((get_row_charlength(rows[i]) + word->length + 1) >= format->row_length) {
-                can_fit = false;
-                free(word);
-            }
-            else {
-                add_word_to_row(rows[i], word);
-                if (go_to_next_word(content, format->row_length)) {
-                    rows[i]->type = END_PARAGRAPH;
+        if (ended_paragraph) {
+            rows[i]->type = EMPTY;
+            ended_paragraph = false;
+        }
+        else {
+            rows[i]->type = NORMAL;
+            bool can_fit = true;
+            do {
+                struct Word *word = get_word(content, format->row_length);
+                if ((get_row_charlength(rows[i]) + word->length + 1) >= format->row_length) {
+                    can_fit = false;
+                    free(word);
+                } else {
+                    add_word_to_row(rows[i], word);
+                    if (go_to_next_word(content, format->row_length)) {
+                        rows[i]->type = END_PARAGRAPH;
+                        ended_paragraph = true;
+                        can_fit = false;
+                    }
                 }
-            }
-        } while (can_fit);
+            } while (can_fit);
+        }
     }
 
     return rows;
