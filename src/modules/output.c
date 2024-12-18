@@ -1,7 +1,17 @@
 #include "stdio.h"
 #include "../includes/output.h"
 
-void create_file(char *file_path, file_content *content, struct Page *pages, struct page_format *format) {
+int create_file(char *file_path, file_content *content, struct Page *pages, struct page_format *format) {
+    FILE *file;
+    if (file_path != NULL) {
+        file = fopen(file_path, "w");
+        if (file == NULL) {
+            return(-2);
+        }
+    }
+    else {
+        file = stdout;
+    }
     struct Page *current_page = pages;
     uint64_t k;
     while (current_page != NULL) {
@@ -18,6 +28,11 @@ void create_file(char *file_path, file_content *content, struct Page *pages, str
                 switch (current_row->type) {
                     case NORMAL:
                         if (current_row->words != NULL) {
+                            if (j != 0) {
+                                for (k = 0; k < format->column_space; k++) {
+                                    fprintf(file ," ");
+                                }
+                            }
                             spaces_left = format->row_length - (get_row_charlength(current_row) - words + 1);
                             if (words <= 1) {
                                 spaces[0] = spaces_left;
@@ -33,50 +48,58 @@ void create_file(char *file_path, file_content *content, struct Page *pages, str
                             word_count = 0;
                             while (current_word != NULL) {
                                 for (k = current_word->start; k < current_word->end; k++) {
-                                    printf("%c", content->bytes[k]);
+                                    fprintf(file, "%c", content->bytes[k]);
                                 }
                                 for (k = 0; k < spaces[word_count]; k++) {
-                                    printf(" ");
+                                    fprintf(file, " ");
                                 }
                                 current_word = current_word->next_word;
                                 word_count++;
                             }
-                            for (k = 0; k < format->column_space; k++) {
-                                printf(" ");
-                            }
                         }
                         break;
                     case END_PARAGRAPH:
+                        if (j != 0) {
+                            for (k = 0; k < format->column_space; k++) {
+                                fprintf(file, " ");
+                            }
+                        }
                         while (current_word != NULL) {
                             for (k = current_word->start; k < current_word->end; k++) {
-                                printf("%c", content->bytes[k]);
+                                fprintf(file, "%c", content->bytes[k]);
                             }
                             if (current_word->next_word != NULL) {
-                                printf(" ");
+                                fprintf(file, " ");
                             }
                             current_word = current_word->next_word;
                         }
-                        for (k = 0; k < (format->column_space + (format->row_length - get_row_charlength(current_row))); k++) {
-                            printf(" ");
+                        for (k = 0; k < (format->row_length - get_row_charlength(current_row)); k++) {
+                            fprintf(file, " ");
                         }
                         break;
                     case EMPTY:
-                        for (k = 0; k < (format->row_length + format->column_space); k++) {
-                            printf(" ");
+                        if (j != 0) {
+                            for (k = 0; k < (format->column_space); k++) {
+                                fprintf(file, " ");
+                            }
+                        }
+                        for (k = 0; k < (format->row_length); k++) {
+                            fprintf(file, " ");
                         }
                         break;
                     case EMPTY_END:
                         break;
                 }
             }
-            printf("\n");
+            fprintf(file, "\n");
         }
         current_page = current_page->next_page;
         if (current_page != NULL) {
-            printf("\n");
+            fprintf(file, "\n");
             for (i = 0; i < ((format->row_length * format->columns) + (format->column_space * (format->columns-1))); i++)
-                printf("-");
-            printf("\n\n");
+                fprintf(file, "-");
+            fprintf(file, "\n\n");
         }
     }
+    return 0;
 }
