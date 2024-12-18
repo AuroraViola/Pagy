@@ -24,7 +24,6 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: OS2-Project
+        name: Pagy
         path: |
-          build/SO2
-          build/res
+          build/pagy
