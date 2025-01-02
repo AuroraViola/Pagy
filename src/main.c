@@ -8,23 +8,27 @@
 #include "includes/output.h"
 
 int main(int argc, char **argv) {
+    // Inizializzazione dei valori di default
     char *input_file = NULL;
     char *output_file = NULL;
-    struct page_format format = {3, 30, 18, 8};
+    struct page_format format = {3, 30, 25, 8};
+    bool multi_process = false;
 
-    int arg_count;
-    const char *short_opt = "o:c:r:s:l:vh";
+    // Parsing delle opzioni
+    const char *short_opt = "o:c:r:s:l:mhv";
     struct option long_opt[] = {
             {"output", required_argument, NULL, 'o'},
             {"columns", required_argument, NULL, 'c'},
             {"rows", required_argument, NULL, 'r'},
             {"spaces", required_argument, NULL, 's'},
             {"length", required_argument, NULL, 'l'},
-            {"version", no_argument, NULL, 'v'},
+            {"multi", no_argument, NULL, 'm'},
             {"help", no_argument, NULL, 'h'},
+            {"version", no_argument, NULL, 'v'},
             {NULL, 0, NULL, 0  }
     };
 
+    int arg_count;
     while((arg_count = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
         switch(arg_count) {
             case -1:
@@ -63,6 +67,10 @@ int main(int argc, char **argv) {
                 }
                 break;
 
+            case 'm':
+                multi_process = true;
+                break;
+
             case 'v':
                 printf("pagy 0.1\n");
                 printf("Copyright © 2024 AuroraViola <https://github.com/AuroraViola>.\n");
@@ -77,6 +85,7 @@ int main(int argc, char **argv) {
                 printf("  -c, --columns, n_ticks            number of columns per page\n");
                 printf("  -h, --help                        display this help and exit\n");
                 printf("  -l, --length, n_ticks             number of characters per row\n");
+                printf("  -m, --multi                       use the multiprocess approach\n");
                 printf("  -o, --output filename             write the output to filename instead of stdout\n");
                 printf("  -r, --rows, n_ticks               number of rows per columns\n");
                 printf("  -s, --spaces, n_ticks             number of spaces between columns\n");
@@ -103,16 +112,27 @@ int main(int argc, char **argv) {
         return -2;
     }
 
-    file_content content = get_file_content(input_file);
-    if (content.bytes == NULL) {
-        fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", input_file);
-        return(-2);
+    // Versione mono-processo del programma
+    if (!multi_process) {
+        // Generazione del file content con gestione degli errori
+        file_content content = get_file_content(input_file);
+        if (content.bytes == NULL) {
+            fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", input_file);
+            return (-2);
+        }
+
+        // Formattazione del contenuto del file
+        struct Page *pages = get_formatted_text(&content, &format);
+
+        // Scrittura nel file di destinazione con gestione degli errori
+        int ret_value = create_file(output_file, &content, pages, &format);
+        if (ret_value == -2) {
+            fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", output_file);
+            return (-2);
+        }
     }
-    struct Page *pages = get_formatted_text(&content, &format);
-    int ret_value = create_file(output_file, &content, pages, &format);
-    if (ret_value == -2) {
-        fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", output_file);
-        return(-2);
+    // Versione multi-processo del programma
+    else {
     }
 
     return 0;
