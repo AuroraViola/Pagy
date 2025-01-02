@@ -2,6 +2,8 @@
 #include <getopt.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 #include "includes/file_reader.h"
 #include "includes/formatting.h"
@@ -133,7 +135,43 @@ int main(int argc, char **argv) {
     }
     // Versione multi-processo del programma
     else {
-    }
+        int p[2];
+        pipe(p);
 
+        int bytes_pipe[2];
+
+        int pid = fork();
+        if (pid == 0) {
+            close(p[0]);
+            file_content content = get_file_content(input_file);
+            if (content.bytes == NULL) {
+                fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", input_file);
+                return (-2);
+            }
+
+            write(p[1], &content, sizeof(file_content));
+            write(p[1], content.bytes, content.length);
+            close(p[1]);
+            exit(EXIT_SUCCESS);
+        }
+        else if (pid < 0) {
+            fprintf(stderr, "Error during fork()\n");
+        }
+        close(p[1]);
+
+        file_content content;
+        read(p[0], &content, sizeof(file_content));
+        content.bytes = malloc(sizeof(uint8_t) * content.length);
+        read(p[0], content.bytes, content.length);
+        close(p[0]);
+
+        struct Page *pages = get_formatted_text(&content, &format);
+
+        int ret_value = create_file(output_file, &content, pages, &format);
+        if (ret_value == -2) {
+            fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", output_file);
+            return (-2);
+        }
+    }
     return 0;
 }
