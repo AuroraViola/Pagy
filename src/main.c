@@ -9,6 +9,7 @@
 #include "includes/formatting.h"
 #include "includes/output.h"
 
+#if defined(MULTI_PROCESS)
 void formatter(int write_fd, file_content *content, struct page_format *format) {
     uint8_t print_next_page = 1;
     uint8_t stop = 0;
@@ -78,23 +79,22 @@ void outputter(int read_fd, file_content *content, struct page_format *format, c
 
     close(read_fd);
 }
+#endif
 
 int main(int argc, char **argv) {
-    // Inizializzazione dei valori di default
+    /* Inizializzazione dei valori di default */
     char *input_file = NULL;
     char *output_file = NULL;
-    struct page_format format = {5, 400, 50, 8};
-    bool multi_process = false;
+    struct page_format format = {3, 32, 25, 8};
 
-    // Parsing delle opzioni
-    const char *short_opt = "o:c:r:s:l:mhv";
+    /* Parsing delle opzioni */
+    const char *short_opt = "o:c:r:s:l:hv";
     struct option long_opt[] = {
             {"output", required_argument, NULL, 'o'},
             {"columns", required_argument, NULL, 'c'},
             {"rows", required_argument, NULL, 'r'},
             {"spaces", required_argument, NULL, 's'},
             {"length", required_argument, NULL, 'l'},
-            {"multi", no_argument, NULL, 'm'},
             {"help", no_argument, NULL, 'h'},
             {"version", no_argument, NULL, 'v'},
             {NULL, 0, NULL, 0  }
@@ -139,12 +139,13 @@ int main(int argc, char **argv) {
                 }
                 break;
 
-            case 'm':
-                multi_process = true;
-                break;
-
             case 'v':
                 printf("pagy 0.1\n");
+                #ifdef MULTI_PROCESS
+                printf("Multi-process version\n");
+                #else
+                printf("Mono-process version\n");
+                #endif
                 printf("Copyright © 2024 AuroraViola <https://github.com/AuroraViola>.\n");
                 printf("License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\n");
                 printf("This is free software: you are free to change and redistribute it.\n");
@@ -157,7 +158,6 @@ int main(int argc, char **argv) {
                 printf("  -c, --columns, n_ticks            number of columns per page\n");
                 printf("  -h, --help                        display this help and exit\n");
                 printf("  -l, --length, n_ticks             number of characters per row\n");
-                printf("  -m, --multi                       use the multiprocess approach\n");
                 printf("  -o, --output filename             write the output to filename instead of stdout\n");
                 printf("  -r, --rows, n_ticks               number of rows per columns\n");
                 printf("  -s, --spaces, n_ticks             number of spaces between columns\n");
@@ -184,96 +184,90 @@ int main(int argc, char **argv) {
         return -2;
     }
 
-    // Versione mono-processo del programma
-    if (!multi_process) {
-        // Generazione del file content con gestione degli errori
+    #ifndef MULTI_PROCESS
+    /* Generazione del file content con gestione degli errori */
+    file_content content = get_file_content(input_file);
+    if (content.bytes == NULL) {
+        fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", input_file);
+        return (-2);
+    }
+
+    /* Formattazione del contenuto del file */
+    struct Page *pages = get_formatted_text(&content, &format);
+
+    /* Scrittura nel file di destinazione con gestione degli errori */
+    int ret_value = create_file(output_file, &content, pages, &format);
+    if (ret_value == -2) {
+        fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", output_file);
+        return (-2);
+    }
+    #else
+    int file_pipe[2];
+    pipe(file_pipe);
+
+    pid_t file_parser = fork();
+    if (file_parser == 0) {
+        close(file_pipe[0]);
         file_content content = get_file_content(input_file);
         if (content.bytes == NULL) {
             fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", input_file);
             return (-2);
         }
 
-        // Formattazione del contenuto del file
-        struct Page *pages = get_formatted_text(&content, &format);
-
-        // Scrittura nel file di destinazione con gestione degli errori
-        int ret_value = create_file(output_file, &content, pages, &format);
-        if (ret_value == -2) {
-            fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", output_file);
-            return (-2);
-        }
-    }
-    // Versione multi-processo del programma
-    else {
-        int file_pipe[2];
-        pipe(file_pipe);
-
-        pid_t file_parser = fork();
-        if (file_parser == 0) {
-            close(file_pipe[0]);
-            file_content content = get_file_content(input_file);
-            if (content.bytes == NULL) {
-                fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", input_file);
-                return (-2);
-            }
-
-            write(file_pipe[1], &content, sizeof(file_content));
-            int block_size = 128;
-            int blocks = content.length / 128;
-            int last_block_size = content.length % 128;
-
-            int i;
-            for (i = 0; i < blocks; i++) {
-                write(file_pipe[1], &content.bytes[i*block_size], block_size);
-            }
-            write(file_pipe[1], &content.bytes[blocks * block_size], last_block_size);
-            close(file_pipe[1]);
-            exit(EXIT_SUCCESS);
-        }
-
-        close(file_pipe[1]);
-        file_content content;
-        read(file_pipe[0], &content, sizeof(file_content));
-        content.bytes = malloc(sizeof(uint8_t) * content.length);
-
+        write(file_pipe[1], &content, sizeof(file_content));
         int block_size = 128;
         int blocks = content.length / 128;
         int last_block_size = content.length % 128;
 
         int i;
         for (i = 0; i < blocks; i++) {
-            read(file_pipe[0], &content.bytes[i*block_size], block_size);
+            write(file_pipe[1], &content.bytes[i*block_size], block_size);
         }
-        read(file_pipe[0], &content.bytes[blocks * block_size], last_block_size);
+        write(file_pipe[1], &content.bytes[blocks * block_size], last_block_size);
+        close(file_pipe[1]);
+        exit(EXIT_SUCCESS);
+    }
 
-        close(file_pipe[0]);
+    close(file_pipe[1]);
+    file_content content;
+    read(file_pipe[0], &content, sizeof(file_content));
+    content.bytes = malloc(sizeof(uint8_t) * content.length);
 
-        int page_pipe[2];
-        pipe(page_pipe);
+    int block_size = 128;
+    int blocks = content.length / 128;
+    int last_block_size = content.length % 128;
 
-        pid_t producer = fork();
-        if (producer == 0) {
-            close(page_pipe[0]);
-            formatter(page_pipe[1], &content, &format);
-            exit(EXIT_SUCCESS);
-        }
-        pid_t consumer = fork();
-        if (consumer == 0) {
-            close(page_pipe[1]);
-            outputter(page_pipe[0], &content, &format, output_file);
-            exit(EXIT_SUCCESS);
-        }
+    int i;
+    for (i = 0; i < blocks; i++) {
+        read(file_pipe[0], &content.bytes[i*block_size], block_size);
+    }
+    read(file_pipe[0], &content.bytes[blocks * block_size], last_block_size);
 
-        int status;
-        for (i = 0; i < 3; i++) {
-            wait(&status);
-            if (status != EXIT_SUCCESS) {
-                printf("Process %i crashed\n", i+1);
-                kill(file_parser, SIGKILL);
-                kill(producer, SIGKILL);
-                kill(consumer, SIGKILL);
-            }
+    close(file_pipe[0]);
+
+    int page_pipe[2];
+    pipe(page_pipe);
+
+    pid_t producer = fork();
+    if (producer == 0) {
+        close(page_pipe[0]);
+        formatter(page_pipe[1], &content, &format);
+        exit(EXIT_SUCCESS);
+    }
+    pid_t consumer = fork();
+    if (consumer == 0) {
+        close(page_pipe[1]);
+        outputter(page_pipe[0], &content, &format, output_file);
+        exit(EXIT_SUCCESS);
+    }
+
+    int status;
+    for (i = 0; i < 3; i++) {
+        wait(&status);
+        if (status != EXIT_SUCCESS) {
+            printf("Process %i crashed\n", i+1);
         }
     }
+    #endif
     return 0;
 }

@@ -30,7 +30,7 @@ file_content get_file_content(char *file_path) {
     if (file != NULL) {
         content.length = get_file_size(file);
 
-        // Vengono allocati in memoria i byte del file per essere salvati nella struttura del file_content
+        /* Vengono allocati in memoria i byte del file per essere salvati nella struttura del file_content */
         content.bytes = malloc(sizeof(uint8_t) * content.length);
         int i;
         for (i = 0; i < content.length; i++) {
