@@ -42,6 +42,7 @@ struct Page {
 // Vedere formatting.c
 int get_word_count(struct Row *row);
 int get_row_charlength(struct Row *row);
+struct Row **get_page_rows(file_content *content, struct page_format *format);
 struct Page *get_formatted_text(file_content *content, struct page_format *format);
 
 #endif //SO2_FORMATTING_H

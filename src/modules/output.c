@@ -4,16 +4,16 @@
 // Questa funzione prende in input:
 // - il file dove stampare l'output
 // - una struttura file_content che serve per avere a portata di mano il contenuto del file
-// - una struttura Page che indica come stampare i byte del file_content
+// - una struttura row che indica le singole righe della pagina
 // - una struttura page_format per indicare i parametri di come stampare la pagina
 // Lo scopo della funzione è quello di stampare una singola pagina
-void print_page(FILE *file, file_content *content, struct Page *page, struct page_format *format) {
+void print_page(FILE *file, file_content *content, struct Row **rows, struct page_format *format) {
     int i, j;
     uint64_t k;
     for (i = 0; i < format->column_height; i++) {
         for (j = 0; j < format->columns; j++) {
             // Viene selezionata la riga corrente
-            struct Row *current_row = page->rows[(format->column_height * j) + i];
+            struct Row *current_row = rows[(format->column_height * j) + i];
             struct Word *current_word = current_row->words;
 
             // Queste variabili serviranno quando bisognerà giustificare il testo
@@ -122,15 +122,11 @@ int create_file(char *file_path, file_content *content, struct Page *pages, stru
     // Viene stampata pagina per pagina
     struct Page *current_page = pages;
     while (current_page != NULL) {
-        print_page(file, content, current_page, format);
+        print_page(file, content, current_page->rows, format);
         current_page = current_page->next_page;
         // Qui viene stampato il separatore
         if (current_page != NULL) {
-            fprintf(file, "\n");
-            int i;
-            for (i = 0; i < ((format->row_length * format->columns) + (format->column_space * (format->columns-1))); i++)
-                fprintf(file, "-");
-            fprintf(file, "\n\n");
+            fprintf(file, "\n %%%\n");
         }
     }
     return 0;

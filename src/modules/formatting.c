@@ -155,7 +155,7 @@ struct Row **get_page_rows(file_content *content, struct page_format *format) {
 
     for (i = 0; i < rows_num; i++) {
         // Alloca la riga
-        rows[i] = malloc(sizeof(struct Row) * format->row_length);
+        rows[i] = malloc(sizeof(struct Row));
         rows[i]->words = NULL;
         // Se la riga precedente era una riga di fine paragrafo, allora questa riga sarà una riga vuota
         if (ended_paragraph) {

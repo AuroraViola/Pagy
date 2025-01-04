@@ -24,6 +24,7 @@ int64_t get_file_size(FILE *file) {
 file_content get_file_content(char *file_path) {
     file_content content;
     content.bytes = NULL;
+    content.index = 0;
 
     FILE *file = fopen(file_path, "rb");
     if (file != NULL) {
