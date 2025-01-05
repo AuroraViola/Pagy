@@ -26,17 +26,36 @@ file_content get_file_content(char *file_path) {
     content.bytes = NULL;
     content.index = 0;
 
-    FILE *file = fopen(file_path, "rb");
-    if (file != NULL) {
-        content.length = get_file_size(file);
+    FILE *file;
+    if (file_path != NULL) {
+        file = fopen(file_path, "rb");
+    }
+    else {
+        file = stdin;
+    }
 
-        /* Vengono allocati in memoria i byte del file per essere salvati nella struttura del file_content */
-        content.bytes = malloc(sizeof(uint8_t) * content.length);
-        int i;
-        for (i = 0; i < content.length; i++) {
-            fread(&content.bytes[i], 1, 1, file);
+    if (file != NULL) {
+        if (file == stdin) {
+            size_t size = 0;
+            int c;
+            while ((c = getchar()) != EOF) {
+                content.bytes = realloc(content.bytes, size + 2);
+                content.bytes[size++] = c;
+            }
+            content.length = size;
         }
-        fclose(file);
+        else {
+            content.length = get_file_size(file);
+            printf("%li\n", content.length);
+
+            /* Vengono allocati in memoria i byte del file per essere salvati nella struttura del file_content */
+            content.bytes = malloc(sizeof(uint8_t) * content.length);
+            int i;
+            for (i = 0; i < content.length; i++) {
+                fread(&content.bytes[i], 1, 1, file);
+            }
+            fclose(file);
+        }
     }
     return content;
 }

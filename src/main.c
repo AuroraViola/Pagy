@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
                 return(0);
 
             case 'h':
-                printf("Usage: pagy {FILE} [OPTION]...\n");
+                printf("Usage: pagy [FILE] [OPTION]...\n");
                 printf("  -c, --columns, n_ticks            number of columns per page\n");
                 printf("  -h, --help                        display this help and exit\n");
                 printf("  -l, --length, n_ticks             number of characters per row\n");
@@ -179,9 +179,7 @@ int main(int argc, char **argv) {
         input_file = argv[optind];
     }
     else {
-        fprintf(stderr, "Usage: pagy {FILE} [OPTION]...\n");
-        fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
-        return -2;
+        input_file = NULL;
     }
 
     #ifndef MULTI_PROCESS
