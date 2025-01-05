@@ -25,6 +25,7 @@ file_content get_file_content(char *file_path) {
     file_content content;
     content.bytes = NULL;
     content.index = 0;
+    content.length = -1;
 
     FILE *file;
     if (file_path != NULL) {
@@ -36,7 +37,8 @@ file_content get_file_content(char *file_path) {
 
     if (file != NULL) {
         if (file == stdin) {
-            size_t size = 0;
+            /* Parte di codice eseguita in caso si tratti di stdin */
+            int64_t size = 0;
             int c;
             while ((c = getchar()) != EOF) {
                 content.bytes = realloc(content.bytes, size + 2);
@@ -46,7 +48,6 @@ file_content get_file_content(char *file_path) {
         }
         else {
             content.length = get_file_size(file);
-            printf("%li\n", content.length);
 
             /* Vengono allocati in memoria i byte del file per essere salvati nella struttura del file_content */
             content.bytes = malloc(sizeof(uint8_t) * content.length);

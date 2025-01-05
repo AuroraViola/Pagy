@@ -2,20 +2,32 @@
 #include <getopt.h>
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <sys/wait.h>
 
 #include "includes/file_reader.h"
 #include "includes/formatting.h"
 #include "includes/output.h"
 
 #if defined(MULTI_PROCESS)
+#include <unistd.h>
+#include <sys/wait.h>
+
+/* Parte di codice eseguita dal processo "producer"
+ * Si occuperà di formattare le righe di una pagina dato il contenuto di un file e il formato desiderato
+ * Una volta eseguita la formattazione verrà scritta la pagina formattata sulla pipe in modo da mandarla al processo consumatore
+ */
 void formatter(int write_fd, file_content *content, struct page_format *format) {
+    /* Questi byte vengono scritti prima del contenuto della pagina
+     * 0 servirà al processo consumatore per capire quando il produttore ha finito il suo lavoro
+     */
     uint8_t print_next_page = 1;
     uint8_t stop = 0;
+
     while (content->index < content->length) {
         write(write_fd, &print_next_page, sizeof(uint8_t));
+        /* Viene generata la pagina */
         struct Row **rows = get_page_rows(content, format);
+
+        /* Viene Scritta sulla pipe la pagina generata e deallocata */
         int i;
         for (i = 0; i < (format->columns * format->column_height); i++) {
             write(write_fd, rows[i], sizeof(struct Row));
@@ -35,7 +47,14 @@ void formatter(int write_fd, file_content *content, struct page_format *format) 
     close(write_fd);
 }
 
+/* Parte di codice eseguita dal processo "consumer"
+ * Si occuperà di stampare su file o stdout le pagine che riceve dal produttore attraverso la pipe
+ *
+ */
 void outputter(int read_fd, file_content *content, struct page_format *format, char *file_path) {
+    /* Sceglie dove scrivere l'output
+     * In caso il valore di file_path sia NULL scrive su stdout
+     */
     FILE *file;
     if (file_path != NULL) {
         file = fopen(file_path, "w");
@@ -47,11 +66,13 @@ void outputter(int read_fd, file_content *content, struct page_format *format, c
         file = stdout;
     }
 
+    /* Byte usato per capire se il produttore ha finito le pagine da produrre*/
     uint8_t next_page;
-
     read(read_fd, &next_page, sizeof(uint8_t));
+
+    struct Row **rows = malloc(sizeof(struct Row *) * format->columns * format->column_height);
     while (next_page != 0) {
-        struct Row **rows = malloc(sizeof(struct Row *) * format->columns * format->column_height);
+        /* Legge dalla pipe la pagina e la "ricrea" */
         int i;
         for (i = 0; i < (format->columns * format->column_height); i++) {
             rows[i] = malloc(sizeof(struct Row));
@@ -69,14 +90,28 @@ void outputter(int read_fd, file_content *content, struct page_format *format, c
                 }
             }
         }
+        /* Stampa la pagina */
         print_page(file, content, rows, format);
-        free(rows);
 
+        /* Libera le righe della pagina dato che non servono più una volta stampate */
+        for (i = 0; i < (format->columns * format->column_height); i++) {
+            if (rows[i]->words != NULL) {
+                struct Word *current_word = rows[i]->words;
+                while (current_word != NULL) {
+                    struct Word *prev_word = current_word;
+                    current_word = current_word->next_word;
+                    free(prev_word);
+                }
+            }
+            free(rows[i]);
+        }
+
+        /* Viene letto il byte di fine pagina e in caso viene stampato il separatore */
         read(read_fd, &next_page, sizeof(uint8_t));
         if (next_page != 0)
-            fprintf (file, "\n %%%\n");
+            fprintf (file, "\n %%%%%%\n");
     }
-
+    free(rows);
     close(read_fd);
 }
 #endif
@@ -90,19 +125,19 @@ int main(int argc, char **argv) {
     /* Parsing delle opzioni */
     const char *short_opt = "o:c:r:s:l:hv";
     struct option long_opt[] = {
-            {"output", required_argument, NULL, 'o'},
+            {"output",  required_argument, NULL, 'o'},
             {"columns", required_argument, NULL, 'c'},
-            {"rows", required_argument, NULL, 'r'},
-            {"spaces", required_argument, NULL, 's'},
-            {"length", required_argument, NULL, 'l'},
-            {"help", no_argument, NULL, 'h'},
-            {"version", no_argument, NULL, 'v'},
-            {NULL, 0, NULL, 0  }
+            {"rows",    required_argument, NULL, 'r'},
+            {"spaces",  required_argument, NULL, 's'},
+            {"length",  required_argument, NULL, 'l'},
+            {"help",    no_argument,       NULL, 'h'},
+            {"version", no_argument,       NULL, 'v'},
+            {NULL, 0,                      NULL, 0}
     };
 
     int arg_count;
-    while((arg_count = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
-        switch(arg_count) {
+    while ((arg_count = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
+        switch (arg_count) {
             case -1:
             case 0:
                 break;
@@ -162,27 +197,26 @@ int main(int argc, char **argv) {
                 printf("  -r, --rows, n_ticks               number of rows per columns\n");
                 printf("  -s, --spaces, n_ticks             number of spaces between columns\n");
                 printf("  -v, --version                     output version information and exit\n");
-                return(0);
+                return (0);
 
             case ':':
             case '?':
                 fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
-                return(-2);
+                return (-2);
 
             default:
                 fprintf(stderr, "%s: invalid option -- %c\n", argv[0], arg_count);
-                return(-2);
+                return (-2);
         }
     }
 
     if (optind < argc) {
         input_file = argv[optind];
-    }
-    else {
+    } else {
         input_file = NULL;
     }
 
-    #ifndef MULTI_PROCESS
+#ifndef MULTI_PROCESS
     /* Generazione del file content con gestione degli errori */
     file_content content = get_file_content(input_file);
     if (content.bytes == NULL) {
@@ -199,31 +233,42 @@ int main(int argc, char **argv) {
         fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", output_file);
         return (-2);
     }
-    #else
+#else
+    /* Creo la pipe per far comunicare il file_parser con il processo padre */
     int file_pipe[2];
-    pipe(file_pipe);
+    if (pipe(file_pipe) < 0) {
+        fprintf(stderr, "pagy: pipe error\n");
+        return -2;
+    }
 
+    /* Viene creato il processo "file_parser" */
     pid_t file_parser = fork();
     if (file_parser == 0) {
         close(file_pipe[0]);
         file_content content = get_file_content(input_file);
         if (content.bytes == NULL) {
             fprintf(stderr, "pagy: cannot access '%s': No such file or directory\n", input_file);
-            return (-2);
+            exit(EXIT_FAILURE);
         }
 
         write(file_pipe[1], &content, sizeof(file_content));
+
+        /* Scrive in blocchi da 128 byte sulla pipe essendo questa di dimensioni limitata */
         int block_size = 128;
         int blocks = content.length / 128;
         int last_block_size = content.length % 128;
-
         int i;
         for (i = 0; i < blocks; i++) {
             write(file_pipe[1], &content.bytes[i*block_size], block_size);
         }
         write(file_pipe[1], &content.bytes[blocks * block_size], last_block_size);
+
         close(file_pipe[1]);
         exit(EXIT_SUCCESS);
+    }
+    else if (file_parser < 0) {
+        fprintf(stderr, "Error: can't fork\n");
+        return -2;
     }
 
     close(file_pipe[1]);
@@ -231,10 +276,10 @@ int main(int argc, char **argv) {
     read(file_pipe[0], &content, sizeof(file_content));
     content.bytes = malloc(sizeof(uint8_t) * content.length);
 
+    /* Legge in blocchi da 128 byte sulla pipe essendo questa di dimensioni limitata */
     int block_size = 128;
     int blocks = content.length / 128;
     int last_block_size = content.length % 128;
-
     int i;
     for (i = 0; i < blocks; i++) {
         read(file_pipe[0], &content.bytes[i*block_size], block_size);
@@ -243,28 +288,41 @@ int main(int argc, char **argv) {
 
     close(file_pipe[0]);
 
+    /* Vengono create le pipe per far comunicare i processi produttore e consumatore */
     int page_pipe[2];
-    pipe(page_pipe);
+    if (pipe(page_pipe) < 0) {
+        fprintf(stderr, "pagy: pipe error\n");
+        return -2;
+    }
 
+    /* Viene creato il processo "producer" che si occuperà di formattare il file */
     pid_t producer = fork();
     if (producer == 0) {
         close(page_pipe[0]);
         formatter(page_pipe[1], &content, &format);
         exit(EXIT_SUCCESS);
     }
+    else if (producer < 0) {
+        fprintf(stderr, "Error: can't fork\n");
+        return -2;
+    }
+
+    /* Viene creato il processo "consumer" che si occuperà di stampare su file ciò che è stato prodotto dal produttore */
     pid_t consumer = fork();
     if (consumer == 0) {
         close(page_pipe[1]);
         outputter(page_pipe[0], &content, &format, output_file);
         exit(EXIT_SUCCESS);
     }
+    else if (consumer < 0) {
+        fprintf(stderr, "Error: can't fork\n");
+        return -2;
+    }
 
+    /* Il processo padre attende il termine dei processi creati*/
     int status;
     for (i = 0; i < 3; i++) {
         wait(&status);
-        if (status != EXIT_SUCCESS) {
-            printf("Process %i crashed\n", i+1);
-        }
     }
     #endif
     return 0;

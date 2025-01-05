@@ -43,7 +43,7 @@ int get_row_charlength(struct Row *row) {
  * "\n"
  * "\t"
  * Altrimenti restituisce true
- * Viene usata principalemente nella funzione go_to_next_word per muovere l'index del file content alla prossima parola
+ * Viene usata principalmente nella funzione go_to_next_word per muovere l'index del file content alla prossima parola
  */
 bool is_utf8_char(uint8_t byte) {
     return ((byte != 0x20) && (byte != 0xd) && (byte != 0xa) && (byte != 0x9));

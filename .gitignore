@@ -2,4 +2,5 @@ build
 cmake-build-debug
 cmake-build-debug-multi
 .idea
-texts/out
+CMakeLists.txt
+texts

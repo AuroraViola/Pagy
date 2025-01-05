@@ -129,7 +129,7 @@ int create_file(char *file_path, file_content *content, struct Page *pages, stru
         current_page = current_page->next_page;
         /* Qui viene stampato il separatore */
         if (current_page != NULL) {
-            fprintf(file, "\n %%%\n");
+            fprintf(file, "\n %%%%%%\n");
         }
     }
     return 0;

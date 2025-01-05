@@ -1,5 +1,5 @@
 CC 		= gcc
-CFLAGS  = -std=c90
+CFLAGS  = -Wall -std=c90
 SRC 	= src/main.c src/includes/* src/modules/*
 
 EXEC_MONO_PROCESS  = pagy-mono
