@@ -8,7 +8,7 @@ Pagy è un programma che ti permette di formattare un file di testo in un file i
 
 Il programma prende in input un testo codificato in UTF-8 e produrrà un testo formattato in stile "pagina di giornale" codificato sempre in UTF-8.
 
-Formattazione dell'output:
+Formato dell'output:
 - Il testo sarà diviso in colonne su ogni pagina
 - Ogni riga è giustificata (tranne quelle di fine paragrafo)
 - Ogni parola su una riga ha almeno uno spazio tra le altre parole
@@ -82,6 +82,8 @@ make
 
 Una volta compilato verranno generati gli eseguibili `pagy-mono` e `pagy-multi` nella cartella `build`.
 
+`pagy-mono` è la versione mono-processo del programma e `pagy-multi` è la versione multi-processo.
+
 ## Uso
 
 Il programma, se usato senza nessuna opzione o argomento, prenderà l'input da `stdin` e scriverà l'output su `stdout`. Eventuali errori saranno stampati su `stderr`.
@@ -96,15 +98,15 @@ Se non specificato nelle opzioni, verranno usati i seguenti parametri per la for
 
 Possono essere utilizzate le seguenti opzioni:
 
-| Opzione | Opzione lunga | Argomenti richiesti | Descrizione                                           |
-|---------|---------------|---------------------|-------------------------------------------------------|
-| `-c`    | `--columns`   | intero > 0          | Indica quante colonne stampare per pagina             |
-| `-h`    | `--help`      | -                   | Stampa una schermata di aiuto ed esce                 |
-| `-l`    | `--length`    | intero > 0          | Indica il numero di caratteri per riga                |
-| `-o`    | `--output`    | stringa             | Indica la path dove salvare l'output del programma    |
-| `-r`    | `--rows`      | intero > 0          | Indica il numero di righe che deve avere una collonna |
-| `-s`    | `--spaces`    | intero >= 0         |                                                       |
-| `-v`    | `--version`   | -                   | Stampa informazioni sulla versione ed esce            |
+| Opzione | Opzione lunga | Argomenti richiesti | Descrizione                                          |
+|---------|---------------|---------------------|------------------------------------------------------|
+| `-c`    | `--columns`   | intero > 0          | Indica quante colonne stampare per pagina            |
+| `-h`    | `--help`      | -                   | Stampa una schermata di aiuto ed esce                |
+| `-l`    | `--length`    | intero > 0          | Indica il numero di caratteri per riga               |
+| `-o`    | `--output`    | stringa             | Indica la path dove salvare l'output del programma   |
+| `-r`    | `--rows`      | intero > 0          | Indica il numero di righe che deve avere una colonna |
+| `-s`    | `--spaces`    | intero >= 0         | Indica il numero di spazi tra una colonna e l'altra  |
+| `-v`    | `--version`   | -                   | Stampa informazioni sulla versione ed esce           |
 
 ## Esempi
 
