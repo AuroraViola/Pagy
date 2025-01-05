@@ -190,12 +190,12 @@ int main(int argc, char **argv) {
 
             case 'h':
                 printf("Usage: pagy [FILE] [OPTION]...\n");
-                printf("  -c, --columns, n_ticks            number of columns per page\n");
+                printf("  -c, --columns, n_cols             number of columns per page\n");
                 printf("  -h, --help                        display this help and exit\n");
-                printf("  -l, --length, n_ticks             number of characters per row\n");
+                printf("  -l, --length, n_chars             number of characters per row\n");
                 printf("  -o, --output filename             write the output to filename instead of stdout\n");
-                printf("  -r, --rows, n_ticks               number of rows per columns\n");
-                printf("  -s, --spaces, n_ticks             number of spaces between columns\n");
+                printf("  -r, --rows, n_rows                number of rows per columns\n");
+                printf("  -s, --spaces, n_spaces            number of spaces between columns\n");
                 printf("  -v, --version                     output version information and exit\n");
                 return (0);
 
